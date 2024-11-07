@@ -1,0 +1,135 @@
+
+trigger:
+- master
+
+variables:
+  DEPOT_TOOLS_WIN_TOOLCHAIN: '0'
+  DEPOT_TOOLS_METRICS: '0'
+  PYTHON_HOME: ''
+  SKIA_REVISION: '9db7378d72bc18d10c40d73e75dd7920849167c9'
+  PYTHONWARNINGS: 'ignore:DEPRECATION::pip._internal.cli.base_command'
+  GCLIENT_PY3: '1'
+
+jobs:
+- job: Build_Skia
+  timeoutInMinutes: 0
+  pool:
+   vmImage: 'windows-latest'
+  steps:
+  - powershell: |
+      Invoke-WebRequest -Uri "https://storage.googleapis.com/chrome-infra/depot_tools.zip" -OutFile depot_tools.zip
+      &7z x depot_tools.zip -odepot_tools
+      Remove-Item depot_tools.zip
+    displayName: 'Fetch depot_tools'
+  
+  - powershell: |
+      $env:DEPOT_TOOLS_WIN_TOOLCHAIN=0
+      $env:Path = "$pwd\depot_tools;" + $env:Path
+      cd depot_tools
+      ./update_depot_tools.bat
+      dir
+    displayName: 'Config depot_tools'
+  
+  - script: |
+      del C:\ProgramData\Chocolatey\bin\pytho*.exe
+      git clone https://skia.googlesource.com/skia
+      cd skia
+      git checkout $(SKIA_REVISION) .
+    displayName: 'Fetch skia repo'
+
+  - powershell: |
+      $env:DEPOT_TOOLS_WIN_TOOLCHAIN=0
+      $env:Path = "$pwd\depot_tools;" + $env:Path
+      refreshenv
+      cd skia
+      python tools/git-sync-deps
+      refreshenv
+    displayName: 'Setup skia deps'
+
+  - script: |
+      set PATH=%cd%\depot_tools;%PATH%;
+      cd skia
+    displayName: 'Sync skia'
+
+  - powershell: |
+      choco install llvm 2>&1>$null
+      refreshenv
+      $env:DEPOT_TOOLS_WIN_TOOLCHAIN=0
+      $env:Path = "$pwd\depot_tools;" + $env:Path
+      python -m pip --disable-pip-version-check install pywin32
+      cd skia
+      (Get-Content gn/toolchain/BUILD.gn).replace('env_setup = "$shell $win_sdk/bin/SetEnv.cmd /x86 && "', ' ') | Set-Content gn/toolchain/BUILD.gn
+      gn gen out/Build_32 --args=' extra_cflags=[\"-DSK_FONT_HOST_USE_SYSTEM_SETTINGS\"] skia_enable_skottie=true skia_enable_tools=true skia_enable_skshaper=true skia_enable_gpu=true clang_win=\"C:\Program Files\LLVM\" is_official_build=true is_debug=false is_component_build=false skia_use_direct3d=true skia_use_vulkan=true skia_use_gl=true skia_use_freetype=true skia_use_harfbuzz=true skia_use_icu=true skia_use_system_expat=false skia_use_system_libjpeg_turbo=false skia_use_system_icu=false skia_use_system_libpng=false skia_use_system_libwebp=false skia_use_system_zlib=false skia_use_system_harfbuzz=false skia_use_system_freetype2=false target_cpu=\"x86\"'
+      gn gen out/Build_64 --args=' extra_cflags=[\"-DSK_FONT_HOST_USE_SYSTEM_SETTINGS\"] skia_enable_skottie=true skia_enable_tools=true skia_enable_skshaper=true skia_enable_gpu=true clang_win=\"C:\Program Files\LLVM\" is_official_build=true is_debug=false is_component_build=false skia_use_direct3d=true skia_use_vulkan=true skia_use_gl=true skia_use_freetype=true skia_use_harfbuzz=true skia_use_icu=true skia_use_system_expat=false skia_use_system_libjpeg_turbo=false skia_use_system_icu=false skia_use_system_libpng=false skia_use_system_libwebp=false skia_use_system_zlib=false skia_use_system_harfbuzz=false skia_use_system_freetype2=false target_cpu=\"x64\"'
+      Get-Content -Path .\out\Build_32\build.ninja
+    displayName: 'Setup build projects'
+
+  - powershell: |
+      $env:Path = "$pwd\depot_tools;" + $env:Path
+      cd skia
+      &("C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars32.bat")
+      autoninja -C out\Build_32 skia
+      autoninja -C out\Build_32 modules/particles
+      autoninja -C out\Build_32 modules/skottie
+      autoninja -C out\Build_32 modules/skplaintexteditor
+      autoninja -C out\Build_32 modules/skparagraph
+      autoninja -C out\Build_32 modules/skresources
+      autoninja -C out\Build_32 modules/svg
+      autoninja -C out\Build_32 modules/sksg
+      autoninja -C out\Build_32 modules/skunicode
+      autoninja -C out\Build_32 modules/skshaper
+      &("C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat")
+      autoninja -C out\Build_64 skia
+      autoninja -C out\Build_64 modules/particles
+      autoninja -C out\Build_64 modules/skottie
+      autoninja -C out\Build_64 modules/skplaintexteditor
+      autoninja -C out\Build_64 modules/skparagraph
+      autoninja -C out\Build_64 modules/skresources
+      autoninja -C out\Build_64 modules/svg
+      autoninja -C out\Build_64 modules/sksg
+      autoninja -C out\Build_64 modules/skunicode
+      autoninja -C out\Build_64 modules/skshaper
+    displayName: 'Build skia'
+
+  - powershell: |
+      New-Item -Name "x64" -ItemType "directory" 
+      New-Item -Name "x86" -ItemType "directory"
+      New-Item -Name "lib" -ItemType "directory"
+      New-Item -Name "Binaries" -ItemType "directory"
+      Copy-Item -Path "skia\out\Build_64\*.lib" -Destination "x64" -Recurse 
+      Copy-Item -Path "skia\out\Build_64\*.dll" -Destination "x64" -Recurse 
+      Copy-Item -Path "skia\out\Build_64\*.pdb" -Destination "x64" -Recurse 
+      Copy-Item -Path "skia\out\Build_32\*.pdb" -Destination "x86" -Recurse 
+      Copy-Item -Path "skia\out\Build_32\*.lib" -Destination "x86" -Recurse 
+      Copy-Item -Path "skia\out\Build_32\*.dll" -Destination "x86" -Recurse 
+      Move-Item -Path "x64" -Destination "lib"
+      Move-Item -Path "x86" -Destination "lib"
+      Move-Item -Path "lib" -Destination "Binaries"
+      Copy-Item -Path "skia\include" -Destination "Binaries" -Recurse 
+      Copy-Item -Path "skia\modules\skottie\include" -Destination "Binaries\modules\skottie\include" -Recurse 
+      Copy-Item -Path "skia\modules\skresources\include" -Destination "Binaries\modules\skresources\include" -Recurse 
+      Copy-Item -Path "skia\modules\skparagraph\include" -Destination "Binaries\modules\skparagraph\include" -Recurse 
+      Copy-Item -Path "skia\modules\skplaintexteditor\include" -Destination "Binaries\modules\skplaintexteditor\include" -Recurse 
+      Copy-Item -Path "skia\modules\svg\include" -Destination "Binaries\modules\svg\include" -Recurse 
+      Copy-Item -Path "skia\modules\skunicode\include" -Destination "Binaries\modules\skunicode\include" -Recurse 
+      Copy-Item -Path "skia\modules\skshaper\include" -Destination "Binaries\modules\skshaper\include" -Recurse 
+      Copy-Item -Path "skia\modules\sksg\include" -Destination "Binaries\modules\sksg\include" -Recurse 
+      Copy-Item -Path "skia\modules\particles\include" -Destination "Binaries\modules\particles\include" -Recurse 
+      7z a $(Build.ArtifactStagingDirectory)\Skia.zip Binaries\*
+    displayName: 'Copy Binaries'
+
+  - publish: $(Build.ArtifactStagingDirectory)/Skia.zip
+    artifact: Skia Binaries
+
+  - task: GitHubRelease@1
+    inputs:
+      gitHubConnection: 'Github PAT'
+      repositoryName: 'msmshazan/skiabuild'
+      action: 'create'
+      target: '$(Build.SourceVersion)'
+      tagSource: 'userSpecifiedTag'
+      tag: 'Release-$(SKIA_REVISION)'
+      title: 'Skia Binaries'
+      changeLogCompareToRelease: 'lastFullRelease'
+      changeLogType: 'commitBased'
+      assets: '$(Build.ArtifactStagingDirectory)/Skia.zip'
