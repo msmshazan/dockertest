@@ -11,7 +11,7 @@ variables:
   GCLIENT_PY3: '1'
 
 jobs:
-- job: Build_Skia
+- job: Build_Docker
   timeoutInMinutes: 0
   pool:
    vmImage: 'windows-latest'
