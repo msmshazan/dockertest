@@ -16,7 +16,7 @@ jobs:
    vmImage: 'windows-latest'
   steps:
   - powershell: |
-      wsl --install
+      wsl --install -d Ubuntu
       New-VM -Name WinContainerHost -MemoryStartupBytes 1GB
       Get-VM WinContainerHost | Set-VMProcessor -ExposeVirtualizationExtensions $true
       [Environment]::SetEnvironmentVariable("LCOW_SUPPORTED", "1", "Machine")
