@@ -17,7 +17,5 @@ jobs:
    vmImage: 'windows-latest'
   steps:
   - powershell: |
-      Invoke-WebRequest -Uri "https://storage.googleapis.com/chrome-infra/depot_tools.zip" -OutFile depot_tools.zip
-      &7z x depot_tools.zip -odepot_tools
-      Remove-Item depot_tools.zip
-    displayName: 'Fetch depot_tools'
+      docker run --hostname=a2b729836f8b --mac-address=02:42:ac:11:00:02 --env=MYSQL_ROOT_PASSWORD=test --env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin --env=GOSU_VERSION=1.17 --env=MYSQL_MAJOR=innovation --env=MYSQL_VERSION=9.1.0-1.el9 --env=MYSQL_SHELL_VERSION=9.1.0-1.el9 --volume=/var/lib/mysql --workdir=/ --restart=no --runtime=runc -d mysql:latest
+    displayName: 'docker run'
