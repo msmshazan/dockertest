@@ -17,15 +17,10 @@ jobs:
    vmImage: 'windows-latest'
   steps:
   - powershell: |
-      [Environment]::SetEnvironmentVariable("LCOW_SUPPORTED", "1", "Machine")
-      Restart-Service docker
-      $configfile = @"
-      {
-      “experimental”: true
-      }
-      "@
-      $configfile|Out-File -FilePath C:\ProgramData\docker\config\daemon.json -Encoding ascii -Force
-      Invoke-WebRequest -Uri "https://github.com/linuxkit/lcow/releases/download/v4.14.35-v0.3.9/release.zip" -UseBasicParsing -OutFile release.zip
-      Expand-Archive release.zip -DestinationPath "$Env:ProgramFiles\Linux Containers\."
+      Install-Module "DockerMsftProvider" -Force
+      Update-Module "DockerMsftProvider"
+      Install-Package Docker -ProviderName "DockerMsftProvider" -Update -Force
+      Set-Content -Value "`{`"experimental`":true`}" -Path C:\ProgramData\docker\config\daemon.json
+      restart-service docker
       docker run --hostname=a2b729836f8b --mac-address=02:42:ac:11:00:02 --env=MYSQL_ROOT_PASSWORD=test --env=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin --env=GOSU_VERSION=1.17 --env=MYSQL_MAJOR=innovation --env=MYSQL_VERSION=9.1.0-1.el9 --env=MYSQL_SHELL_VERSION=9.1.0-1.el9 --volume=/var/lib/mysql --workdir=/ --restart=no --runtime=runc -d mysql:latest
     displayName: 'docker run'
