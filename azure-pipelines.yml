@@ -17,7 +17,6 @@ jobs:
    vmImage: 'windows-latest'
   steps:
   - powershell: |
-      Get-VM WinContainerHost | Set-VMProcessor -ExposeVirtualizationExtensions $true
       [Environment]::SetEnvironmentVariable("LCOW_SUPPORTED", "1", "Machine")
       Restart-Service docker
       $configfile = @"
