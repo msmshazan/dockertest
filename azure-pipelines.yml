@@ -16,6 +16,14 @@ jobs:
    vmImage: 'windows-latest'
   steps:
   - powershell: |
+      $wslupd = wsl --update --web-download | Out-String
+      $wslupd
+      if ($wslupd) {
+        wsl --version
+        wsl --set-default-version 1
+        wsl --install --distribution Ubuntu-20.04 --web-download --no-launch
+      }  
+  - powershell: |
       & $Env:ProgramFiles\Docker\Docker\DockerCli.exe -SwitchDaemon
       wsl --install -d Ubuntu
       New-VM -Name WinContainerHost -MemoryStartupBytes 1GB
